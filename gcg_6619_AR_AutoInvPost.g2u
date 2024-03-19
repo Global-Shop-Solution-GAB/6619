@@ -1,0 +1,101 @@
+﻿Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+Function.Intrinsic.UI.UsePixels ' Allows you to use Pixels instead of Twips throughout
+F.Intrinsic.Control.Try
+V.Local.sError.Declare
+v.Local.iOption.Declare
+v.Local.bOption.Declare
+v.Local.sLog.Declare
+v.Local.sText.Declare
+v.Local.sInvoice.Declare
+v.Local.sSql.Declare
+
+'This program runs from the task scheduler.
+'It selects all shipments already selected for invoicing.
+'It then creates and posts the invoice batch.
+'E-Invoicing should be configured properly to automatically send  invoices during batch processing.
+'Company option should be turned on to automatically select shipments for invoicing. (when the shipment is 'shipped', it's automatically selected for invoicing)
+
+
+'check to make sure certain company options are enabled.  Without these, this program will not run correctly.
+'402135 numeric value setting for e-Invoicing
+'0 auto send
+'1 review during batch
+'2 review after batch
+f.Global.General.ReadOption(402135,2,0,v.Local.iOption)
+f.Intrinsic.Control.If(v.Local.iOption,<>,0)
+	f.Intrinsic.String.Build("Company Option Not Set!{0}Order Entry > Administration > E-Invoicing Options{0}Set the Drop Down at the top left to read 'Send Emails Without Review'",v.Ambient.NewLine,v.Local.sText)
+f.Intrinsic.Control.EndIf
+
+f.Global.General.ReadOption(401690,0,0,"0000",V.Local.bOption)
+'if we're  not auto selecting shipments, this won't work.
+f.Intrinsic.Control.If(v.Local.bOption,<>,"True")
+	f.Intrinsic.String.Build("{0}{1}{1}Company Option Not Set{1}System Support > Administration > Company Options Advanced >> Order Entry{1}Turn on the option to 'Auto Select Orders to Invoice from Shipping'{1}The sub option below it is optional.",v.Local.sText,v.Ambient.NewLine,v.Local.sText)
+f.Intrinsic.Control.EndIf
+
+'modify this so it sends the log to someone and not just storing it somewhere
+f.Intrinsic.Control.If(v.Local.sText.Length,>,0)
+	f.Intrinsic.String.Build("{0}\GCG_6619_AutoInvPost_ErrorLog.txt",v.Caller.FilesDir,v.Local.sLog)
+	f.Intrinsic.File.String2File(v.Local.sLog,v.Local.sText)
+	f.Intrinsic.Control.End
+f.Intrinsic.Control.EndIf
+
+'get the last invoice number in GSS so we can get all the new invioces created after.
+f.ODBC.Connection!con.opencompanyconnection
+f.ODBC.Connection!con.ExecuteAndReturn("SELECT DISTINCT INVOICE FROM V_SHIPMENT_HEADER",v.Local.sInvoice)
+f.ODBC.Connection!con.Close
+
+'options checked out ok, lets create the new invoices.
+'the below callwrapper will create and update an invoice batch for all shipments in open invoice status:  the "SLCTALL" parameter tells the callwrapper to select all open invoices and not just a single order.
+f.Global.General.CallWrapperSync(7060,"SLCTALL")
+
+'*********************************************************
+'e-invoicing should launch during the above callwrapper step
+'if it does not, then it's only creating the batch.
+
+'f.Intrinsic.String.Build("select invoice from v_order_hist_head where invoice > '{0}'",v.Local.sInvoice,v.Local.sSql)
+'f.ODBC.Connection!con.opencompanyconnection
+'f.ODBC.Connection!con.ExecuteAndReturn(v.Local.sSql,v.Local.sInvoice)
+'f.ODBC.Connection!con.Close
+
+f.Intrinsic.String.Replace(v.Local.sInvoice,"#$#",v.Ambient.NewLine,v.Local.sInvoice)
+f.Intrinsic.String.Build("Invoices Posted at {0}{1}{2}",v.Ambient.Now,v.Ambient.NewLine,v.Local.sInvoice,v.Local.sText)
+
+f.Intrinsic.Control.If(v.Local.sText.Length,>,0)
+	f.Intrinsic.String.Build("{0}\GCG_6619_AutoInvPost_Posting.txt",v.Caller.FilesDir,v.Local.sLog)
+	f.Intrinsic.File.String2File(v.Local.sLog,v.Local.sText)
+f.Intrinsic.Control.EndIf
+
+f.Intrinsic.Control.End
+
+f.Intrinsic.Control.catch
+f.Intrinsic.Control.CallSub(catching,"sub",v.Ambient.CurrentSubroutine,"errorno",v.Ambient.ErrorNumber,"errordesc",v.Ambient.ErrorDescription)
+f.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.Catching.Start
+v.Local.sError.declare(string)
+F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}","gcg_6619_AR_AutoInvPost.g2u",V.Ambient.NewLine,v.Args.sub,V.Args.errorno,V.args.errordesc,V.Local.sError)
+f.Intrinsic.UI.Msgbox(v.Local.sError)
+F.Intrinsic.Control.CallSub(unload)
+Program.Sub.Catching.End
+
+
+Program.Sub.unload.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare
+
+f.Intrinsic.Control.End
+
+
+f.Intrinsic.Control.catch
+f.Intrinsic.Control.CallSub(catching,"sub",v.Ambient.CurrentSubroutine,"errorno",v.Ambient.ErrorNumber,"errordesc",v.Ambient.ErrorDescription)
+f.Intrinsic.Control.EndTry
+Program.Sub.unload.End
+
+Program.Sub.Comments.Start
+${$5$}$20.1.8369.28112$}$1
+${$6$}$dfinch$}$20221207150908412$}$2O16bu3pcn8yPLUxA6F2Klx+ibLK1MdjBpudGVb+OnUjCJ/oeSjVzrxNqD+F3fOLO+oRzIh/lv8=
+Program.Sub.Comments.End
